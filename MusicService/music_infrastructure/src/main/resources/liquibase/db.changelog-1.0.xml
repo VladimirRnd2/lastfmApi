@@ -1,0 +1,150 @@
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.4.xsd">
+
+
+    <changeSet id="1.0.0" author="com.zuzex">
+        <createTable tableName="track">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="name" type="varchar(250)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+
+            <column name="mbid" type="varchar(250)">
+                <constraints nullable="true"/>
+            </column>
+
+            <column name="listeners" type="integer">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="playcount" type="integer">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="artist_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="album_id" type="bigint">
+                <constraints nullable="true"/>
+            </column>
+
+        </createTable>
+    </changeSet>
+
+    <changeSet id="1.0.1" author="com.zuzex">
+        <createTable tableName="artist">
+
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="name" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="mbid" type="varchar(250)">
+                <constraints nullable="true"/>
+            </column>
+
+        </createTable>
+    </changeSet>
+
+    <changeSet id="1.0.2" author="com.zuzex">
+        <createTable tableName="album">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="name" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+
+            <column name="mbid" type="varchar(250)">
+                <constraints nullable="true"/>
+            </column>
+
+            <column name="artist_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="1.0.3" author="com.zuzex">
+        <createTable tableName="genre">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="varchar(100)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="1.0.4" author="com.zuzex">
+        <createTable tableName="track_genre">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="track_id" type="bigint">
+            </column>
+            <column name="genre_id" type="bigint">
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="1.0.5" author="com.zuzex">
+        <addForeignKeyConstraint baseColumnNames="track_id"
+                                 baseTableName="track_genre"
+                                 constraintName="fk_track_genre_track"
+                                 onDelete="CASCADE"
+                                 onUpdate="RESTRICT"
+                                 referencedColumnNames="id"
+                                 referencedTableName="track"/>
+    </changeSet>
+
+    <changeSet id="1.0.6" author="com.zuzex">
+        <addForeignKeyConstraint baseColumnNames="genre_id"
+                                 baseTableName="track_genre"
+                                 constraintName="fk_track_genre_genre"
+                                 onDelete="CASCADE"
+                                 onUpdate="RESTRICT"
+                                 referencedColumnNames="id"
+                                 referencedTableName="genre"/>
+    </changeSet>
+
+    <changeSet id="1.0.7" author="com.zuzex">
+        <addForeignKeyConstraint baseColumnNames="artist_id"
+                                 baseTableName="album"
+                                 constraintName="fk_album_artist"
+                                 onDelete="CASCADE"
+                                 onUpdate="RESTRICT"
+                                 referencedColumnNames="id"
+                                 referencedTableName="artist"/>
+    </changeSet>
+
+    <changeSet id="1.0.8" author="com.zuzex">
+        <addForeignKeyConstraint baseColumnNames="artist_id"
+                                 baseTableName="track"
+                                 constraintName="fk_track_artist"
+                                 onDelete="CASCADE"
+                                 onUpdate="RESTRICT"
+                                 referencedColumnNames="id"
+                                 referencedTableName="artist"/>
+    </changeSet>
+
+    <changeSet id="1.0.9" author="com.zuzex">
+        <addForeignKeyConstraint baseTableName="track"
+                                 baseColumnNames="album_id"
+                                 constraintName="fk_track_album"
+                                 onDelete="CASCADE"
+                                 onUpdate="CASCADE"
+                                 referencedTableName="album"
+                                 referencedColumnNames="id"/>
+    </changeSet>
+</databaseChangeLog>
