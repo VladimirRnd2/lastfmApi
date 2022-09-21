@@ -1,20 +1,19 @@
 package usercase;
 
 import com.zuzex.music.model.Artist;
-import com.zuzex.music.usecase.artist.CreateArtistImpl;
-import com.zuzex.music.usecase.artist.FindArtistImpl;
-import com.zuzex.music.usecase.artist.port.ArtistRepositoryService;
+import com.zuzex.music.usecase.artist.ArtistService;
+import com.zuzex.music.usecase.artist.port.ArtistStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -22,10 +21,10 @@ import static org.mockito.Mockito.when;
 class CreateArtistImplTest {
 
     @Mock
-    private ArtistRepositoryService artistRepositoryService;
+    private ArtistStorageService artistStorageService;
 
     @InjectMocks
-    private CreateArtistImpl createArtist;
+    private ArtistService artistService;
 
     private Artist artist;
 
@@ -40,8 +39,8 @@ class CreateArtistImplTest {
 
     @Test
     void createArtist() {
-        when(artistRepositoryService.createArtist(any(Artist.class))).thenReturn(Mono.just(artist));
-        Mono<Artist> artistMono = createArtist.createArtist(Artist.builder().build());
+        when(artistStorageService.createArtist(any(Artist.class))).thenReturn(Mono.just(artist));
+        Mono<Artist> artistMono = artistService.createArtist(Artist.builder().build());
         StepVerifier.create(artistMono)
                 .consumeNextWith(newArtist -> {
                     assertNotNull(newArtist);

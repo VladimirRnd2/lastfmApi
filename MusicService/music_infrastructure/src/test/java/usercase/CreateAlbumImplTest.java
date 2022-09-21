@@ -2,20 +2,19 @@ package usercase;
 
 import com.zuzex.music.model.Album;
 import com.zuzex.music.model.Artist;
-import com.zuzex.music.usecase.album.CreateAlbumImpl;
-import com.zuzex.music.usecase.album.FindAlbumImpl;
-import com.zuzex.music.usecase.album.port.AlbumRepositoryService;
+import com.zuzex.music.usecase.album.AlbumService;
+import com.zuzex.music.usecase.album.port.AlbumStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
@@ -24,10 +23,10 @@ import static org.mockito.Mockito.when;
 class CreateAlbumImplTest {
 
     @Mock
-    private AlbumRepositoryService albumRepositoryService;
+    private AlbumStorageService albumRepositoryService;
 
     @InjectMocks
-    private CreateAlbumImpl createAlbum;
+    private AlbumService albumService;
 
     private Album album;
 
@@ -43,8 +42,8 @@ class CreateAlbumImplTest {
 
     @Test
     void createAlbum() {
-        when(albumRepositoryService.createAlbum(any(Album.class),anyLong())).thenReturn(Mono.just(album));
-        Mono<Album> albumMono = createAlbum.createAlbum(Album.builder().build(), 1L);
+        when(albumRepositoryService.createAlbum(any(Album.class), anyLong())).thenReturn(Mono.just(album));
+        Mono<Album> albumMono = albumService.createAlbum(Album.builder().build(), 1L);
         StepVerifier.create(albumMono)
                 .consumeNextWith(newAlbum -> {
                     assertNotNull(newAlbum);

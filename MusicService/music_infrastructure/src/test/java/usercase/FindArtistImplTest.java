@@ -1,8 +1,8 @@
 package usercase;
 
 import com.zuzex.music.model.Artist;
-import com.zuzex.music.usecase.artist.FindArtistImpl;
-import com.zuzex.music.usecase.artist.port.ArtistRepositoryService;
+import com.zuzex.music.usecase.artist.ArtistServiceImpl;
+import com.zuzex.music.usecase.artist.port.ArtistStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,10 +20,10 @@ import static org.mockito.Mockito.when;
 class FindArtistImplTest {
 
     @Mock
-    private ArtistRepositoryService artistRepositoryService;
+    private ArtistStorageService artistStorageService;
 
     @InjectMocks
-    private FindArtistImpl findArtist;
+    private ArtistServiceImpl artistService;
 
     private Artist artist;
 
@@ -39,8 +39,8 @@ class FindArtistImplTest {
 
     @Test
     void getById() {
-        when(artistRepositoryService.getById(1L)).thenReturn(Mono.just(artist));
-        Mono<Artist> byId = findArtist.getById(1L);
+        when(artistStorageService.getById(1L)).thenReturn(Mono.just(artist));
+        Mono<Artist> byId = artistService.getById(1L);
         StepVerifier
                 .create(byId)
                 .consumeNextWith(newArtist -> {
@@ -56,8 +56,8 @@ class FindArtistImplTest {
 
     @Test
     void getArtistByName() {
-        when(artistRepositoryService.getByName("Papa Rome")).thenReturn(Mono.just(artist));
-        Mono<Artist> papa_rome = findArtist.getArtistByName("Papa Rome");
+        when(artistStorageService.getByName("Papa Rome")).thenReturn(Mono.just(artist));
+        Mono<Artist> papa_rome = artistService.getArtistByName("Papa Rome");
         StepVerifier
                 .create(papa_rome)
                 .consumeNextWith(newArtist -> {

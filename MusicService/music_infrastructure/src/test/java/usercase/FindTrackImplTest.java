@@ -4,8 +4,8 @@ import com.zuzex.music.model.Album;
 import com.zuzex.music.model.Artist;
 import com.zuzex.music.model.Genre;
 import com.zuzex.music.model.Track;
-import com.zuzex.music.usecase.track.FindTrackImpl;
-import com.zuzex.music.usecase.track.port.TrackRepositoryService;
+import com.zuzex.music.usecase.track.TrackService;
+import com.zuzex.music.usecase.track.port.TrackStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,10 +28,10 @@ import static org.mockito.Mockito.when;
 class FindTrackImplTest {
 
     @Mock
-    private TrackRepositoryService trackRepositoryService;
+    private TrackStorageService trackStorageService;
 
     @InjectMocks
-    private FindTrackImpl findTrack;
+    private TrackService trackService;
 
     private Track track;
 
@@ -51,8 +51,8 @@ class FindTrackImplTest {
 
     @Test
     void findById() {
-        when(trackRepositoryService.getById(anyLong())).thenReturn(Mono.just(track));
-        Mono<Track> byId = findTrack.findById(1L);
+        when(trackStorageService.getById(anyLong())).thenReturn(Mono.just(track));
+        Mono<Track> byId = trackService.findById(1L);
         StepVerifier.create(byId)
                 .consumeNextWith(newTrack -> {
                     assertNotNull(newTrack);
@@ -74,8 +74,8 @@ class FindTrackImplTest {
 
     @Test
     void findByName() {
-        when(trackRepositoryService.getByName(anyString())).thenReturn(Mono.just(track));
-        Mono<Track> lalala = findTrack.findByName("lalala");
+        when(trackStorageService.getByName(anyString())).thenReturn(Mono.just(track));
+        Mono<Track> lalala = trackService.findByName("lalala");
         StepVerifier.create(lalala)
                 .consumeNextWith(newTrack -> {
                     assertNotNull(newTrack);
@@ -97,8 +97,8 @@ class FindTrackImplTest {
 
     @Test
     void findAll() {
-        when(trackRepositoryService.getAllTracks()).thenReturn(Flux.just(track));
-        Flux<Track> all = findTrack.findAll();
+        when(trackStorageService.getAllTracks()).thenReturn(Flux.just(track));
+        Flux<Track> all = trackService.findAll();
         StepVerifier.create(all)
                 .consumeNextWith(newTrack -> {
                     assertNotNull(newTrack);
@@ -120,8 +120,8 @@ class FindTrackImplTest {
 
     @Test
     void findByGenre() {
-        when(trackRepositoryService.getByGenre(anyString())).thenReturn(Flux.just(track));
-        Flux<Track> lalala = findTrack.findByGenre("lalala");
+        when(trackStorageService.getByGenre(anyString())).thenReturn(Flux.just(track));
+        Flux<Track> lalala = trackService.findByGenre("lalala");
         StepVerifier.create(lalala)
                 .consumeNextWith(newTrack -> {
                     assertNotNull(newTrack);
@@ -143,8 +143,8 @@ class FindTrackImplTest {
 
     @Test
     void findByArtistId() {
-        when(trackRepositoryService.getByArtistId(anyLong())).thenReturn(Flux.just(track));
-        Flux<Track> byArtistId = findTrack.findByArtistId(1L);
+        when(trackStorageService.getByArtistId(anyLong())).thenReturn(Flux.just(track));
+        Flux<Track> byArtistId = trackService.findByArtistId(1L);
         StepVerifier.create(byArtistId)
                 .consumeNextWith(newTrack -> {
                     assertNotNull(newTrack);
@@ -166,8 +166,8 @@ class FindTrackImplTest {
 
     @Test
     void findByArtistName() {
-        when(trackRepositoryService.getByArtistName(anyString())).thenReturn(Flux.just(track));
-        Flux<Track> lalala = findTrack.findByArtistName("lalala");
+        when(trackStorageService.getByArtistName(anyString())).thenReturn(Flux.just(track));
+        Flux<Track> lalala = trackService.findByArtistName("lalala");
         StepVerifier.create(lalala)
                 .consumeNextWith(newTrack -> {
                     assertNotNull(newTrack);

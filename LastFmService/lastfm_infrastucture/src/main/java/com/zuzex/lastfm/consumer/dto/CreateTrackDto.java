@@ -10,7 +10,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class CreateTrackDto {
-
     private String songName;
     private String artistName;
 }

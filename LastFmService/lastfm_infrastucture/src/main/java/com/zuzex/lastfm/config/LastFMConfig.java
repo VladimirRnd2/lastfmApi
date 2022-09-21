@@ -2,17 +2,15 @@ package com.zuzex.lastfm.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zuzex.lastfm.consumer.impl.KafkaConsumerImpl;
-import com.zuzex.lastfm.usercase.album.CreateAlbum;
-import com.zuzex.lastfm.usercase.album.CreateAlbumImpl;
-import com.zuzex.lastfm.usercase.artist.CreateArtist;
-import com.zuzex.lastfm.usercase.artist.CreateArtistImpl;
-import com.zuzex.lastfm.usercase.genre.CreateGenre;
-import com.zuzex.lastfm.usercase.genre.CreateGenreImpl;
-import com.zuzex.lastfm.usercase.track.CreateTrack;
-import com.zuzex.lastfm.usercase.track.CreateTrackImpl;
-import com.zuzex.lastfm.usercase.track.UpdateTrack;
-import com.zuzex.lastfm.usercase.track.UpdateTrackImpl;
-import com.zuzex.lastfm.usercase.track.port.KafkaConsumer;
+import com.zuzex.lastfm.usecase.album.AlbumService;
+import com.zuzex.lastfm.usecase.album.AlbumServiceImpl;
+import com.zuzex.lastfm.usecase.artist.ArtistService;
+import com.zuzex.lastfm.usecase.artist.ArtistServiceImpl;
+import com.zuzex.lastfm.usecase.genre.GenreService;
+import com.zuzex.lastfm.usecase.genre.GenreServiceImpl;
+import com.zuzex.lastfm.usecase.track.TrackService;
+import com.zuzex.lastfm.usecase.track.TrackServiceImpl;
+import com.zuzex.lastfm.usecase.track.port.KafkaConsumer;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -42,7 +40,12 @@ public class LastFMConfig {
 
     @Bean
     public KafkaConsumer kafkaConsumer() {
-        return new KafkaConsumerImpl(objectMapper(),createTrack(), updateTrack());
+        return new KafkaConsumerImpl(objectMapper(),trackService());
+    }
+
+    @Bean
+    public TrackService trackService() {
+        return new TrackServiceImpl(albumService(),artistService(),genreService());
     }
 
     @Bean
@@ -51,28 +54,18 @@ public class LastFMConfig {
     }
 
     @Bean
-    public CreateTrack createTrack() {
-        return new CreateTrackImpl(createAlbum(),createArtist(),createGenre());
+    public ArtistService artistService() {
+        return new ArtistServiceImpl();
     }
 
     @Bean
-    public UpdateTrack updateTrack() {
-        return new UpdateTrackImpl();
+    public AlbumService albumService() {
+        return new AlbumServiceImpl();
     }
 
     @Bean
-    public CreateArtist createArtist() {
-        return new CreateArtistImpl();
-    }
-
-    @Bean
-    public CreateAlbum createAlbum() {
-        return new CreateAlbumImpl();
-    }
-
-    @Bean
-    public CreateGenre createGenre() {
-        return new CreateGenreImpl();
+    public GenreService genreService() {
+        return new GenreServiceImpl();
     }
 
     @Bean

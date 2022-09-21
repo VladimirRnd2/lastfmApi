@@ -4,11 +4,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zuzex.lastfm.consumer.dto.CreateTrackDto;
-import com.zuzex.lastfm.model.TrackRs;
-import com.zuzex.lastfm.usercase.track.CreateTrack;
-import com.zuzex.lastfm.usercase.track.UpdateTrack;
-import com.zuzex.lastfm.usercase.track.port.KafkaConsumer;
-import de.umass.lastfm.Album;
+import com.zuzex.lastfm.model.TrackResponse;
+import com.zuzex.lastfm.usecase.track.TrackService;
+import com.zuzex.lastfm.usecase.track.port.KafkaConsumer;
 import lombok.AllArgsConstructor;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -20,8 +18,9 @@ import java.util.List;
 public class KafkaConsumerImpl implements KafkaConsumer {
 
     private final ObjectMapper objectMapper;
-    private final CreateTrack createTrack;
-    private final UpdateTrack updateTrack;
+    private final TrackService trackService;
+
+    private static final TypeReference<List<TrackResponse>> typeReference = new TypeReference<List<TrackResponse>>() {};
 
     @Override
     @KafkaListener(topics = "bookRq", groupId = "foo", containerFactory = "kafkaListenerContainerFactory")
@@ -31,18 +30,17 @@ public class KafkaConsumerImpl implements KafkaConsumer {
         switch (key) {
             case "track" -> {
                 CreateTrackDto dtoTrack = objectMapper.readValue(consumerRecord.value(), CreateTrackDto.class);
-                return objectMapper.writeValueAsString(List.of(createTrack.createNewTrack(dtoTrack.getSongName(), dtoTrack.getArtistName())));
+                return objectMapper.writeValueAsString(List.of(trackService.createNewTrack(dtoTrack.getSongName(), dtoTrack.getArtistName())));
             }
             case "album" -> {
                 CreateTrackDto dtoAlbum = objectMapper.readValue(consumerRecord.value(), CreateTrackDto.class);
-                return objectMapper.writeValueAsString(createTrack.createAlbumTracks(dtoAlbum.getSongName(), dtoAlbum.getArtistName()));
+                return objectMapper.writeValueAsString(trackService.createAlbumTracks(dtoAlbum.getSongName(), dtoAlbum.getArtistName()));
             }
             case "update" -> {
-                List<TrackRs> trackRs = objectMapper.readValue(consumerRecord.value(), new TypeReference<List<TrackRs>>() {
-                });
-                return objectMapper.writeValueAsString(updateTrack.updateTracks(trackRs));
+                List<TrackResponse> trackRS = objectMapper.readValue(consumerRecord.value(), typeReference);
+                return objectMapper.writeValueAsString(trackService.updateTracks(trackRS));
             }
         }
-        return "Wrong method!!!";
+        throw new RuntimeException("Wrong Method!");
     }
 }

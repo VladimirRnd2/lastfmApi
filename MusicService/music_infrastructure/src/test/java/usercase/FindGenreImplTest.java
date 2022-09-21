@@ -1,20 +1,20 @@
 package usercase;
 
 import com.zuzex.music.model.Genre;
-import com.zuzex.music.usecase.genre.FindGenreImpl;
-import com.zuzex.music.usecase.genre.port.GenreRepositoryService;
+import com.zuzex.music.usecase.genre.GenreServiceImpl;
+import com.zuzex.music.usecase.genre.port.GenreStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -23,10 +23,10 @@ import static org.mockito.Mockito.when;
 class FindGenreImplTest {
 
     @Mock
-    private GenreRepositoryService genreRepositoryService;
+    private GenreStorageService genreStorageService;
 
     @InjectMocks
-    private FindGenreImpl findGenre;
+    private GenreServiceImpl genreService;
 
     private Genre genre;
 
@@ -40,8 +40,8 @@ class FindGenreImplTest {
 
     @Test
     void getById() {
-        when(genreRepositoryService.getById(anyLong())).thenReturn(Mono.just(genre));
-        Mono<Genre> byId = findGenre.getById(1L);
+        when(genreStorageService.getById(anyLong())).thenReturn(Mono.just(genre));
+        Mono<Genre> byId = genreService.getById(1L);
         StepVerifier.create(byId)
                 .consumeNextWith(newGenre -> {
                     assertNotNull(newGenre);
@@ -53,8 +53,8 @@ class FindGenreImplTest {
 
     @Test
     void getByName() {
-        when(genreRepositoryService.getByName(anyString())).thenReturn(Mono.just(genre));
-        Mono<Genre> pop = findGenre.getByName("pop");
+        when(genreStorageService.getByName(anyString())).thenReturn(Mono.just(genre));
+        Mono<Genre> pop = genreService.getByName("pop");
         StepVerifier.create(pop)
                 .consumeNextWith(newGenre -> {
                     assertNotNull(newGenre);
@@ -66,8 +66,8 @@ class FindGenreImplTest {
 
     @Test
     void findAllByTrackId() {
-        when(genreRepositoryService.findAllByTrackId(anyLong())).thenReturn(Flux.just(genre));
-        Flux<Genre> allByTrackId = findGenre.findAllByTrackId(1L);
+        when(genreStorageService.findAllByTrackId(anyLong())).thenReturn(Flux.just(genre));
+        Flux<Genre> allByTrackId = genreService.findAllByTrackId(1L);
         StepVerifier.create(allByTrackId)
                 .consumeNextWith(newGenre -> {
                     assertNotNull(newGenre);

@@ -4,15 +4,13 @@ import com.zuzex.music.model.Album;
 import com.zuzex.music.model.Artist;
 import com.zuzex.music.model.Genre;
 import com.zuzex.music.model.Track;
-import com.zuzex.music.usecase.track.CreateTrackImpl;
-import com.zuzex.music.usecase.track.port.TrackRepositoryService;
+import com.zuzex.music.usecase.track.TrackService;
+import com.zuzex.music.usecase.track.port.TrackStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -20,7 +18,8 @@ import reactor.test.StepVerifier;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -28,10 +27,10 @@ import static org.mockito.Mockito.when;
 class CreateTrackImplTest {
 
     @Mock
-    private TrackRepositoryService trackRepositoryService;
+    private TrackStorageService trackStorageService;
 
     @InjectMocks
-    private CreateTrackImpl createTrack;
+    private TrackService trackService;
 
     private Track track;
 
@@ -51,8 +50,8 @@ class CreateTrackImplTest {
 
     @Test
     void createTrack() {
-        when(trackRepositoryService.saveTrack(any(Track.class))).thenReturn(Mono.just(track));
-        Mono<Track> trackMono = createTrack.createTrack(Track.builder().build());
+        when(trackStorageService.saveTrack(any(Track.class))).thenReturn(Mono.just(track));
+        Mono<Track> trackMono = trackService.createTrack(Track.builder().build());
         StepVerifier.create(trackMono)
                 .consumeNextWith(newTrack -> {
                     assertNotNull(newTrack);
@@ -74,8 +73,8 @@ class CreateTrackImplTest {
 
     @Test
     void createTracksByAlbum() {
-        when(trackRepositoryService.saveAll(any())).thenReturn(Flux.just(track));
-        Flux<Track> tracksByAlbum = createTrack.createTracksByAlbum(List.of(Track.builder().build()));
+        when(trackStorageService.saveAll(any())).thenReturn(Flux.just(track));
+        Flux<Track> tracksByAlbum = trackService.createTracksByAlbum(List.of(Track.builder().build()));
         StepVerifier.create(tracksByAlbum)
                 .consumeNextWith(newTrack -> {
                     assertNotNull(newTrack);

@@ -6,234 +6,197 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zuzex.music.controller.TrackController;
 import com.zuzex.music.controller.requests.TrackCreateRequest;
 import com.zuzex.music.model.Track;
-import com.zuzex.music.usecase.track.CreateTrack;
-import com.zuzex.music.usecase.track.FindTrack;
-import com.zuzex.music.usecase.track.UpdateTrack;
-import lombok.AllArgsConstructor;
-import lombok.SneakyThrows;
-import lombok.extern.java.Log;
+import com.zuzex.music.usecase.track.TrackService;
+import lombok.RequiredArgsConstructor;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.header.internals.RecordHeader;
 import org.springframework.data.redis.core.ReactiveHashOperations;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.kafka.requestreply.ReplyingKafkaTemplate;
 import org.springframework.kafka.requestreply.RequestReplyFuture;
-import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.util.concurrent.ListenableFutureCallback;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 @RestController
 @RequestMapping("/api/track")
-@AllArgsConstructor
-@Log
+@RequiredArgsConstructor
 public class TrackControllerImpl implements TrackController {
 
-    private final CreateTrack createTrack;
-    private final FindTrack findTrack;
-    private final UpdateTrack updateTrack;
+    private final TrackService trackService;
     private final ReplyingKafkaTemplate<String, String, String> replyingKafkaTemplate;
     private final ObjectMapper objectMapper;
     private final ReactiveStringRedisTemplate reactiveStringRedisTemplate;
+    private final ReactiveHashOperations<String, String, String> opsForHash;
+
+    private static final TypeReference<List<Track>> typeReference = new TypeReference<List<Track>>() {};
+
+    // вынести в отдельный утилитный класс констант
+    private static final String CREATE_NEW_TRACK = "mono/track/create";
+    private static final String GET_TRACK_BY_ID = "mono/track/id";
+    private static final String GET_TRACK_BY_NAME_KEY = "mono/track/name";
+    private static final String GET_ALL_TRACKS = "flux/track/all";
+    private static final String GET_TRACKS_BY_GENRE = "flux/track/genre";
+    private static final String GET_TRACKS_BY_ARTIST_NAME = "flux/track/artist";
+    private static final String BOOK_REQUEST_TOPIC_NAME = "bookRq";
 
 
     @Override
     @PostMapping("/create")
-    public Mono<Track> createTrack(@RequestBody TrackCreateRequest request) throws JsonProcessingException, ExecutionException, InterruptedException {
-        String key = "mono/track/create";
+    public Mono<Track> createTrack(@RequestBody TrackCreateRequest request) throws JsonProcessingException {
         String hashKey = objectMapper.writeValueAsString(request);
-        ReactiveHashOperations<String, String, String> opsForHash = reactiveStringRedisTemplate.opsForHash();
-        ProducerRecord<String, String> producerRecord = new ProducerRecord<>("bookRq", "track", objectMapper.writeValueAsString(request));
-        return opsForHash.get(key, hashKey).map(s -> {
-            try {
-                return objectMapper.readValue(s, Track.class);
-            } catch (JsonProcessingException e) {
-                e.printStackTrace();
-            }
-            return null;
-        }).switchIfEmpty(createTrack
-                .createTrack(objectMapper
-                        .readValue(replyingKafkaTemplate
-                                .sendAndReceive(producerRecord).get().value(), new TypeReference<List<Track>>() {
-                        }).get(0))
-                .doOnNext(track -> {
-                    try {
-                        reactiveStringRedisTemplate.scan(ScanOptions.scanOptions().match("flux/*").build()).flatMap(reactiveStringRedisTemplate::delete).subscribe();
-                        opsForHash.put(key, hashKey, objectMapper.writeValueAsString(track)).subscribe();
-                    } catch (JsonProcessingException e) {
-                        e.printStackTrace();
-                    }
-                })
-        );
+        ProducerRecord<String, String> producerRecord = new ProducerRecord<>(BOOK_REQUEST_TOPIC_NAME, "track", objectMapper.writeValueAsString(request));
+        return opsForHash.get(CREATE_NEW_TRACK, hashKey)
+                .flatMap(this::readMonoTrackFromJson)
+                .onErrorMap(exception -> new RuntimeException(exception.getMessage()))
+                .switchIfEmpty(Mono.defer(() ->
+                        readMonoTrackListFromJsonCreate(producerRecord)
+                                .flatMap(trackList -> trackService.createTrack(trackList.get(0)))
+                                .flatMap(track -> writeMonoTrackListToJsonAndPutToCacheCreate(track, CREATE_NEW_TRACK, hashKey))
+                ))
+                .onErrorMap(exception -> new RuntimeException(exception.getMessage()));
     }
 
-    // логика кэша - сначала проверяем кэш, есть ли у нас объект по ключу request.
-    // Если есть - сразу возвращаем Flux<Track>, если нет - создаем объект и сохраняем его в кэш и очищаем методы получения списков Track
     @Override
     @PostMapping("/createByAlbum")
     public Flux<Track> createTracksByAlbum(@RequestBody TrackCreateRequest request) throws JsonProcessingException, ExecutionException, InterruptedException {
-        // здесь необходимо добавить логику интеграции с кафкой, т.е. ReplyingKafkaTemplate.sendAndReceive()
-        ProducerRecord<String, String> producerRecord = new ProducerRecord<>("bookRq", "album", objectMapper.writeValueAsString(request));
-        producerRecord.headers().add(new RecordHeader(KafkaHeaders.REPLY_TOPIC, "bookRs".getBytes(StandardCharsets.UTF_8)));
+
+        ProducerRecord<String, String> producerRecord = new ProducerRecord<>(BOOK_REQUEST_TOPIC_NAME, "album", objectMapper.writeValueAsString(request));
         RequestReplyFuture<String, String, String> future = replyingKafkaTemplate.sendAndReceive(producerRecord);
         ConsumerRecord<String, String> record = future.get();
-        List<Track> trackList = objectMapper.readValue(record.value(), new TypeReference<List<Track>>() {
-        });
-        return createTrack.createTracksByAlbum(trackList);
+        List<Track> trackList = objectMapper.readValue(record.value(), typeReference);
+        return trackService.createTracksByAlbum(trackList);
     }
 
     @Override
     @GetMapping("/{id}")
     public Mono<Track> getTrackById(@PathVariable(name = "id") Long id) {
-        String key = "mono/track/" + id;
-        ReactiveHashOperations<String, String, String> opsForHash = reactiveStringRedisTemplate.opsForHash();
-        return opsForHash.get(key, id.toString()).map(track -> {
-            try {
-                return objectMapper.readValue(track, Track.class);
-            } catch (JsonProcessingException e) {
-                e.printStackTrace();
-            }
-            return null;
-        }).switchIfEmpty(findTrack.findById(id).doOnNext(track -> {
-            try {
-                opsForHash.put(key, track.getId().toString(), objectMapper.writeValueAsString(track)).subscribe();
-            } catch (JsonProcessingException e) {
-                e.printStackTrace();
-            }
-        }));
+        return opsForHash.get(GET_TRACK_BY_ID, id.toString())
+                .flatMap(this::readMonoTrackFromJson)
+                .onErrorMap(exception -> new RuntimeException(exception.getMessage()))
+                .switchIfEmpty(Mono.defer(() ->
+                        trackService.findById(id)
+                                .flatMap(track -> writeMonoTrackToJsonAndPutToCacheById(track, GET_TRACK_BY_ID))))
+                .onErrorMap(exception -> new RuntimeException(exception.getMessage()));
     }
 
     @Override
     @GetMapping("/name")
-    public Mono<Track> getTrackByName(@RequestParam(name = "track.name") String name) {
-        String key = "mono/track/name" + name;
-        ReactiveHashOperations<String, String, String> opsForHash = reactiveStringRedisTemplate.opsForHash();
-        return opsForHash.get(key, name).map(track -> {
-            try {
-                return objectMapper.readValue(track, Track.class);
-            } catch (JsonProcessingException e) {
-                e.printStackTrace();
-            }
-            return null;
-        }).switchIfEmpty(findTrack.findByName(name).doOnNext(track -> {
-            try {
-                opsForHash.put(key, name, objectMapper.writeValueAsString(track)).subscribe();
-            } catch (JsonProcessingException e) {
-                e.printStackTrace();
-            }
-        }));
+    public Mono<Track> getTrackByName(@RequestParam(name = "track.name") String name) { // некорректное название параметра track.name . Какое имя будет корректно?
+        return opsForHash.get(GET_TRACK_BY_NAME_KEY, name)
+                .flatMap(this::readMonoTrackFromJson)
+                .onErrorMap(e -> new RuntimeException(e.getMessage()))
+                .switchIfEmpty(Mono.defer(() ->
+                        trackService.findByName(name)
+                                .flatMap(track -> writeMonoTrackToJsonAndPutToCache(track, GET_TRACK_BY_NAME_KEY))))
+                .onErrorMap(e -> new RuntimeException(e.getMessage()));
     }
 
     @Override
     @GetMapping("/")
     public Flux<Track> getAllTracks() {
-        String key = "flux/track/all";
-        ReactiveHashOperations<String, String, String> opsForHash = reactiveStringRedisTemplate.opsForHash();
-        return opsForHash.get(key, key).map(str -> {
-            try {
-                return objectMapper.readValue(str, new TypeReference<List<Track>>() {
-                });
-            } catch (JsonProcessingException e) {
-                e.printStackTrace();
-            }
-            return null;
-        }).flatMapMany(Flux::fromIterable).switchIfEmpty(findTrack
-                .findAll()
-                .collectList()
-                .doOnNext(tracks -> {
-                    try {
-                        opsForHash.put(key, key, objectMapper.writeValueAsString(tracks)).subscribe();
-                    } catch (JsonProcessingException e) {
-                        e.printStackTrace();
-                    }
-                }).flatMapMany(Flux::fromIterable));
+        return opsForHash.get(GET_ALL_TRACKS, GET_ALL_TRACKS)
+                .flatMap(this::readMonoTrackListFromJson)
+                .flatMapMany(Flux::fromIterable)
+                .onErrorMap(e -> new RuntimeException(e.getMessage()))
+                .switchIfEmpty(Flux.defer(() -> trackService.findAll()
+                        .collectList()
+                        .flatMap(tracks -> writeMonoTrackListToJsonAndPutToCache(tracks, GET_ALL_TRACKS, GET_ALL_TRACKS))
+                        .flatMapMany(Flux::fromIterable)))
+                .onErrorMap(e -> new RuntimeException(e.getMessage()));
     }
 
     @Override
     @GetMapping("/genre")
     public Flux<Track> getTracksByGenre(@RequestParam(name = "track.genre") String genre) {
-        String key = "flux/track/genre";
-        String hashKey = "flux/track/genre" + genre;
-        ReactiveHashOperations<String, String, String> opsForHash = reactiveStringRedisTemplate.opsForHash();
-        return opsForHash.get(key, genre).map(s -> {
-                    try {
-                        return objectMapper.readValue(s, new TypeReference<List<Track>>() {
-                        });
-                    } catch (JsonProcessingException e) {
-                        e.printStackTrace();
-                    }
-                    return null;
-                }).flatMapMany(Flux::fromIterable)
-                .switchIfEmpty(findTrack.findByGenre(genre).collectList().doOnNext(tracks -> {
-                    try {
-                        opsForHash.put(key, genre, objectMapper.writeValueAsString(tracks)).subscribe();
-                    } catch (JsonProcessingException e) {
-                        e.printStackTrace();
-                    }
-                }).flatMapMany(Flux::fromIterable));
+        return opsForHash.get(GET_TRACKS_BY_GENRE, genre)
+                .flatMap(this::readMonoTrackListFromJson)
+                .onErrorMap(ex -> new RuntimeException(ex.getMessage()))
+                .flatMapMany(Flux::fromIterable)
+                .switchIfEmpty(Flux.defer(() -> trackService.findByGenre(genre)
+                        .collectList()
+                        .flatMap(tracks -> writeMonoTrackListToJsonAndPutToCache(tracks, GET_TRACKS_BY_GENRE, genre))
+                        .flatMapMany(Flux::fromIterable)))
+                .onErrorMap(e -> new RuntimeException(e.getMessage()));
     }
 
     @Override
     @GetMapping("/artist")
     public Flux<Track> getTracksByArtist(@RequestParam(name = "artist.name") String artistName) {
-        String key = "flux/track/artist";
-        ReactiveHashOperations<String, String, String> opsForHash = reactiveStringRedisTemplate.opsForHash();
-        return opsForHash.get(key, artistName).map(s -> {
-                    try {
-                        return objectMapper.readValue(s, new TypeReference<List<Track>>() {
-                        });
-                    } catch (JsonProcessingException e) {
-                        e.printStackTrace();
-                    }
-                    return null;
-                }).flatMapMany(Flux::fromIterable)
-                .switchIfEmpty(findTrack.findByArtistName(artistName).collectList().doOnNext(tracks -> {
-                    try {
-                        opsForHash.put(key, artistName, objectMapper.writeValueAsString(tracks)).subscribe();
-                    } catch (JsonProcessingException e) {
-                        e.printStackTrace();
-                    }
-                }).flatMapMany(Flux::fromIterable));
+        return opsForHash.get(GET_TRACKS_BY_ARTIST_NAME, artistName)
+                .flatMap(this::readMonoTrackListFromJson)
+                .onErrorMap(exception -> new RuntimeException(exception.getMessage()))
+                .flatMapMany(Flux::fromIterable)
+                .switchIfEmpty(Flux.defer(() -> trackService.findByArtistName(artistName)
+                        .collectList()
+                        .flatMap(trackList -> writeMonoTrackListToJsonAndPutToCache(trackList, GET_TRACKS_BY_ARTIST_NAME, artistName))
+                        .flatMapMany(Flux::fromIterable)))
+                .onErrorMap(exception -> new RuntimeException(exception.getMessage()));
     }
 
     @Async
     @Scheduled(fixedRate = 3600 * 1000)
     public void updateTracks() {
-        reactiveStringRedisTemplate.scan(ScanOptions.scanOptions().match("*/track/*").build()).flatMap(reactiveStringRedisTemplate::delete).subscribe();
-        ReactiveHashOperations<String, String, String> hashOperations = reactiveStringRedisTemplate.opsForHash();
-        findTrack.findAll().collectList().map(tracks -> {
-            try {
-                ProducerRecord<String, String> producerRecord = new ProducerRecord<>("bookRq", "update", objectMapper.writeValueAsString(tracks));
-                producerRecord.headers().add(new RecordHeader(KafkaHeaders.REPLY_TOPIC, "bookRs".getBytes(StandardCharsets.UTF_8)));
-                RequestReplyFuture<String, String, String> future = replyingKafkaTemplate.sendAndReceive(producerRecord);
-                future.addCallback(new ListenableFutureCallback<ConsumerRecord<String, String>>() {
-                    @Override
-                    public void onFailure(Throwable ex) {
-                        ex.printStackTrace();
-                    }
+        reactiveStringRedisTemplate
+                .scan(ScanOptions.scanOptions().match("*/track/*").build())
+                .flatMap(reactiveStringRedisTemplate::delete)
+                .then(trackService.findAll()
+                        .collectList()
+                        .flatMap(tracks -> Mono.fromCallable(() -> {
+                            ProducerRecord<String, String> producerRecord = new ProducerRecord<>(BOOK_REQUEST_TOPIC_NAME, "update", objectMapper.writeValueAsString(tracks));
+                            ConsumerRecord<String, String> record = replyingKafkaTemplate.sendAndReceive(producerRecord).get();
+                            List<Track> trackList = objectMapper.readValue(record.value(), typeReference);
+                            System.out.println(trackList);
+                            trackService.updateTracks(trackList);
+                            return tracks;
+                        })))
+                .subscribe();
+    }
 
-                    @SneakyThrows
-                    @Override
-                    public void onSuccess(ConsumerRecord<String, String> result) {
-                        List<Track> trackList = objectMapper.readValue(result.value(), new TypeReference<List<Track>>() {
-                        });
-                        System.out.println(trackList);
-                        updateTrack.updateTracks(trackList);
-                    }
-                });
-            } catch (JsonProcessingException e) {
-                e.printStackTrace();
-            }
-            return tracks;
-        }).subscribe();
+    private Mono<Track> readMonoTrackFromJson(String jsonTrack) {
+        return Mono.fromCallable(() -> objectMapper.readValue(jsonTrack, Track.class));
+    }
+
+    private Mono<Track> writeMonoTrackToJsonAndPutToCache(Track track, String key) {
+        return Mono.fromCallable(() -> objectMapper.writeValueAsString(track))
+                .flatMap(string -> opsForHash.put(key, track.getName(), string))
+                .thenReturn(track);
+    }
+
+    private Mono<Track> writeMonoTrackToJsonAndPutToCacheById(Track track, String key) {
+        return Mono.fromCallable(() -> objectMapper.writeValueAsString(track))
+                .flatMap(string -> opsForHash.put(key, track.getId().toString(), string))
+                .thenReturn(track);
+    }
+
+    private Mono<List<Track>> readMonoTrackListFromJson(String jsonTrackList) {
+        return Mono.fromCallable(() -> objectMapper.readValue(jsonTrackList, typeReference));
+    }
+
+    private Mono<List<Track>> writeMonoTrackListToJsonAndPutToCache(List<Track> trackList, String key, String hKey) {
+        return Mono.fromCallable(() -> objectMapper.writeValueAsString(trackList))
+                .flatMap(string -> opsForHash.put(key, hKey, string))
+                .thenReturn(trackList);
+    }
+
+    private Mono<List<Track>> readMonoTrackListFromJsonCreate(ProducerRecord<String, String> producerRecord) {
+        return Mono.fromCallable(() -> replyingKafkaTemplate.sendAndReceive(producerRecord).get().value())
+                .flatMap(s -> Mono.fromCallable(() -> objectMapper.readValue(s, typeReference)));
+    }
+
+    private Mono<Track> writeMonoTrackListToJsonAndPutToCacheCreate(Track track, String key, String hKey) {
+        return Mono.fromCallable(() -> objectMapper.writeValueAsString(track))
+                .flatMap(string -> reactiveStringRedisTemplate
+                        .scan(ScanOptions.scanOptions().match("flux/*").build())
+                        .flatMap(reactiveStringRedisTemplate::delete)
+                        .flatMap(map -> opsForHash.put(key, hKey, string))
+                        .collectList()
+                        .thenReturn(track));
     }
 }

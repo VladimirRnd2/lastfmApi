@@ -2,19 +2,19 @@ package usercase;
 
 import com.zuzex.music.model.Album;
 import com.zuzex.music.model.Artist;
-import com.zuzex.music.usecase.album.FindAlbumImpl;
-import com.zuzex.music.usecase.album.port.AlbumRepositoryService;
+import com.zuzex.music.usecase.album.AlbumServiceImpl;
+import com.zuzex.music.usecase.album.port.AlbumStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
@@ -22,10 +22,10 @@ import static org.mockito.Mockito.when;
 class FindAlbumImplTest {
 
     @Mock
-    private AlbumRepositoryService albumRepositoryService;
+    private AlbumStorageService albumRepositoryService;
 
     @InjectMocks
-    private FindAlbumImpl findAlbum;
+    private AlbumServiceImpl albumService;
 
     private Album album;
 
@@ -42,7 +42,7 @@ class FindAlbumImplTest {
     @Test
     void getById() {
         when(albumRepositoryService.getById(1L)).thenReturn(Mono.just(album));
-        Mono<Album> byId = findAlbum.getById(1L);
+        Mono<Album> byId = albumService.getById(1L);
         StepVerifier.create(byId)
                 .consumeNextWith(newAlbum -> {
                     assertNotNull(newAlbum);
@@ -58,7 +58,7 @@ class FindAlbumImplTest {
     @Test
     void getByName() {
         when(albumRepositoryService.getByName(anyString())).thenReturn(Mono.just(album));
-        Mono<Album> lalala = findAlbum.getByName("lalala");
+        Mono<Album> lalala = albumService.getByName("lalala");
         StepVerifier.create(lalala)
                 .consumeNextWith(newAlbum -> {
                     assertNotNull(newAlbum);
