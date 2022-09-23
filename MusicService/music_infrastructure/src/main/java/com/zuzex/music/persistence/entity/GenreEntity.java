@@ -18,6 +18,7 @@ import java.util.List;
 @NoArgsConstructor
 @Table(name = "genre")
 public class GenreEntity implements Serializable {
+
     @Id
     private Long id;
 

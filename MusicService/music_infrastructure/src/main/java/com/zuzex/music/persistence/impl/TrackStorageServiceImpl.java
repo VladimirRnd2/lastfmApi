@@ -6,7 +6,7 @@ import com.zuzex.music.model.Genre;
 import com.zuzex.music.model.Track;
 import com.zuzex.music.persistence.entity.TrackEntity;
 import com.zuzex.music.persistence.entity.TrackGenreEntity;
-import com.zuzex.music.persistence.mapper.TrackRepositoryMapper;
+import com.zuzex.music.persistence.mapper.TrackMapper;
 import com.zuzex.music.persistence.repository.TrackGenreReactiveRepository;
 import com.zuzex.music.persistence.repository.TrackReactiveRepository;
 import com.zuzex.music.usecase.album.AlbumService;
@@ -30,7 +30,7 @@ public class TrackStorageServiceImpl implements TrackStorageService {
     private final AlbumService albumService;
     private final ArtistService artistService;
     private final GenreService genreService;
-    private final TrackRepositoryMapper trackMapper;
+    private final TrackMapper trackMapper;
 
 
     @Override
@@ -51,16 +51,14 @@ public class TrackStorageServiceImpl implements TrackStorageService {
     @Override
     public Mono<Track> saveTrack(Track track) {
         return getByName(track.getName())
-                .switchIfEmpty(artistService
-                        .getArtistByName(track.getArtist().getName())
+                .switchIfEmpty(artistService.getArtistByName(track.getArtist().getName())
                         .switchIfEmpty(artistService
                                 .createArtist(track.getArtist()))
                         .flatMap(
-                                artistEntity -> createOrGetAlbumEntity(track, artistEntity))
-                        .flatMap(album -> trackReactiveRepository
-                                .save(mapToTrackEntityWithSave(track, album)))
-                        .flatMap(trackEntity -> mapMonoTrackToTrack(Mono.just(trackEntity)))
-                        .doOnNext(resultTrack -> createGenresByTrack(track.getGenres(), resultTrack.getId())));
+                                artistEntity -> createOrGetAlbumEntity(track, artistEntity)
+                                        .flatMap(album -> trackReactiveRepository
+                                                .save(trackMapper.mapToTrackEntityWithSave(track, album, artistEntity.getId()))))
+                        .flatMap(trackEntity -> createGenresByTrackAndReturnTrack(track.getGenres(), trackEntity.getId())));
     }
 
     @Override
@@ -70,12 +68,12 @@ public class TrackStorageServiceImpl implements TrackStorageService {
 
     @Override
     public Mono<Track> getByName(String name) {
-        return mapMonoTrackToTrack(trackReactiveRepository.findByName(name));
+        return trackReactiveRepository.findByName(name).flatMap(this::mapMonoTrackToTrack);
     }
 
     @Override
     public Mono<Track> getById(Long id) {
-        return mapMonoTrackToTrack(trackReactiveRepository.findById(id));
+        return trackReactiveRepository.findById(id).flatMap(this::mapMonoTrackToTrack);
     }
 
     @Override
@@ -98,93 +96,47 @@ public class TrackStorageServiceImpl implements TrackStorageService {
         trackReactiveRepository.saveAll(trackList.stream().map(trackMapper::mapToEntity).collect(Collectors.toList())).subscribe();
     }
 
-    private Mono<Track> mapMonoTrackToTrack(Mono<TrackEntity> trackEntityMono) {
-        Mono<Artist> artistMono = trackEntityMono.flatMap(trackEntity -> artistService.getById(trackEntity.getArtistId()));
-        Mono<Album> albumMono = trackEntityMono.flatMap(trackEntity -> albumService.getById(trackEntity.getAlbumId()));
-        Mono<List<Genre>> listGenreMono = trackEntityMono.flatMap(trackEntity -> genreService.findAllByTrackId(trackEntity.getId()).collectList());
-        return Mono.zip(trackEntityMono, artistMono, albumMono, listGenreMono).map(tuple4 -> Track.builder()
-                .id(tuple4.getT1().getId())
-                .name(tuple4.getT1().getName())
-                .mbid(tuple4.getT1().getMbid())
-                .playcount(tuple4.getT1().getPlaycount())
-                .listeners(tuple4.getT1().getListeners())
-                .artist(Artist.builder()
-                        .id(tuple4.getT2().getId())
-                        .name(tuple4.getT2().getName())
-                        .mbid(tuple4.getT2().getMbid())
-                        .build())
-                .album(Album.builder()
-                        .id(tuple4.getT3().getId())
-                        .name(tuple4.getT3().getName())
-                        .mbid(tuple4.getT3().getMbid())
-                        .build())
-                .genres(tuple4.getT4().stream().map(genreEntity -> Genre.builder()
-                                .id(genreEntity.getId())
-                                .name(genreEntity.getName())
-                                .build())
-                        .collect(Collectors.toList()))
-                .build());
+    private Mono<Track> mapMonoTrackToTrack(TrackEntity trackEntity) {
+        Mono<Artist> artistMono = artistService.getById(trackEntity.getArtistId());
+        Mono<Album> albumMono = albumService.getById(trackEntity.getAlbumId());
+        Mono<List<Genre>> listGenreMono = genreService.findAllByTrackId(trackEntity.getId()).collectList();
+        return trackMapper.mapToTrackFromTrackEntity(trackEntity, artistMono, albumMono, listGenreMono);
     }
 
     private Flux<Track> mapFluxTrackEntityToFluxTrack(Flux<TrackEntity> trackEntityFlux) {
-
         return trackEntityFlux.flatMap(trackEntity -> {
             Mono<Artist> artistMono = artistService.getById(trackEntity.getArtistId());
             Mono<Album> albumMono = albumService.getById(trackEntity.getAlbumId());
             Mono<List<Genre>> listGenreMono = genreService.findAllByTrackId(trackEntity.getId()).collectList();
-            Mono<Track> map = Mono.zip(artistMono, albumMono, listGenreMono).map(tuple -> Track.builder()
-                    .id(trackEntity.getId())
-                    .name(trackEntity.getName())
-                    .mbid(trackEntity.getMbid())
-                    .playcount(trackEntity.getPlaycount())
-                    .listeners(trackEntity.getListeners())
-                    .artist(Artist.builder()
-                            .id(trackEntity.getArtistId())
-                            .name(tuple.getT1().getName())
-                            .mbid(tuple.getT1().getMbid())
-                            .build())
-                    .album(Album.builder()
-                            .id(trackEntity.getAlbumId())
-                            .name(tuple.getT2().getName())
-                            .mbid(tuple.getT2().getMbid())
-                            .build())
-                    .genres(tuple.getT3().stream().map(genreEntity -> Genre.builder().id(genreEntity.getId()).name(genreEntity.getName()).build()).collect(Collectors.toList()))
-                    .build());
-            return map;
+            return trackMapper.mapToTrackFromTrackEntity(trackEntity, artistMono, albumMono, listGenreMono);
         });
     }
 
-    private void createGenresByTrack(List<Genre> genres, Long trackId) {
-        genres.forEach(genre -> {
-            genreService.getByName(genre.getName())
-                    .switchIfEmpty(Mono.defer(() -> genreService.createGenre(genre)))
-                    .flatMap(genreEntity -> trackGenreReactiveRepository
-                            .save(TrackGenreEntity.builder().trackId(trackId).genreId(genreEntity.getId()).build()))
-                    .subscribe();
-        });
-    }
-
-    private TrackEntity mapToTrackEntityWithSave(Track track, Album albumEntity) {
-        return TrackEntity.builder()
-                .name(track.getName())
-                .mbid(track.getMbid())
-                .listeners(track.getListeners())
-                .playcount(track.getPlaycount())
-                .albumId(albumEntity.getId())
-                .artistId(albumEntity.getArtist().getId())
-                .build();
+    private Mono<Track> createGenresByTrackAndReturnTrack(List<Genre> genres, Long trackId) {
+        return Flux.fromIterable(genres)
+                .flatMap(genre ->
+                        genreService.getByName(genre.getName())
+                                .switchIfEmpty(Mono.defer(() -> genreService.createGenre(genre)))
+                                .flatMap(genreEntity -> trackGenreReactiveRepository
+                                        .save(TrackGenreEntity.builder().trackId(trackId).genreId(genreEntity.getId()).build())))
+                .flatMap(trackGenreEntity -> trackReactiveRepository.findById(trackGenreEntity.getTrackId()))
+                .collectList()
+                .map(trackEntities -> trackEntities.get(0))
+                .flatMap(this::mapMonoTrackToTrack);
     }
 
     private Mono<Album> createOrGetAlbumEntity(Track track, Artist artist) {
         if (track.getAlbum().getName() != null) {
             return albumService
-                    .createAlbum(track.getAlbum(), artist.getId());
+                    .getByName(track.getAlbum().getName())
+                    .switchIfEmpty(Mono.defer(() -> albumService
+                            .createAlbum(track.getAlbum(), artist.getId())));
         } else {
             return albumService
-                    .getByName(track.getAlbum().getName())
-                    .switchIfEmpty(
-                            albumService
-                                    .createAlbum(track.getAlbum(), artist.getId()));
+                    .createAlbum(Album.builder()
+                                    .name("No Album")
+                                    .build(),
+                            artist.getId());
         }
     }
 }

@@ -1,7 +1,6 @@
 package com.zuzex.music.controller.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zuzex.music.controller.TrackController;
 import com.zuzex.music.controller.requests.TrackCreateRequest;
@@ -24,6 +23,8 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
+import static com.zuzex.music.shared.constants.CommonConstants.*;
+
 @RestController
 @RequestMapping("/api/track")
 @RequiredArgsConstructor
@@ -35,23 +36,11 @@ public class TrackControllerImpl implements TrackController {
     private final ReactiveStringRedisTemplate reactiveStringRedisTemplate;
     private final ReactiveHashOperations<String, String, String> opsForHash;
 
-    private static final TypeReference<List<Track>> typeReference = new TypeReference<List<Track>>() {};
-
-    // вынести в отдельный утилитный класс констант
-    private static final String CREATE_NEW_TRACK = "mono/track/create";
-    private static final String GET_TRACK_BY_ID = "mono/track/id";
-    private static final String GET_TRACK_BY_NAME_KEY = "mono/track/name";
-    private static final String GET_ALL_TRACKS = "flux/track/all";
-    private static final String GET_TRACKS_BY_GENRE = "flux/track/genre";
-    private static final String GET_TRACKS_BY_ARTIST_NAME = "flux/track/artist";
-    private static final String BOOK_REQUEST_TOPIC_NAME = "bookRq";
-
-
     @Override
     @PostMapping("/create")
     public Mono<Track> createTrack(@RequestBody TrackCreateRequest request) throws JsonProcessingException {
         String hashKey = objectMapper.writeValueAsString(request);
-        ProducerRecord<String, String> producerRecord = new ProducerRecord<>(BOOK_REQUEST_TOPIC_NAME, "track", objectMapper.writeValueAsString(request));
+        ProducerRecord<String, String> producerRecord = new ProducerRecord<>(KAFKA_REQUEST_TOPIC_VALUE, "track", objectMapper.writeValueAsString(request));
         return opsForHash.get(CREATE_NEW_TRACK, hashKey)
                 .flatMap(this::readMonoTrackFromJson)
                 .onErrorMap(exception -> new RuntimeException(exception.getMessage()))
@@ -67,7 +56,7 @@ public class TrackControllerImpl implements TrackController {
     @PostMapping("/createByAlbum")
     public Flux<Track> createTracksByAlbum(@RequestBody TrackCreateRequest request) throws JsonProcessingException, ExecutionException, InterruptedException {
 
-        ProducerRecord<String, String> producerRecord = new ProducerRecord<>(BOOK_REQUEST_TOPIC_NAME, "album", objectMapper.writeValueAsString(request));
+        ProducerRecord<String, String> producerRecord = new ProducerRecord<>(KAFKA_REQUEST_TOPIC_VALUE, "album", objectMapper.writeValueAsString(request));
         RequestReplyFuture<String, String, String> future = replyingKafkaTemplate.sendAndReceive(producerRecord);
         ConsumerRecord<String, String> record = future.get();
         List<Track> trackList = objectMapper.readValue(record.value(), typeReference);
@@ -149,7 +138,7 @@ public class TrackControllerImpl implements TrackController {
                 .then(trackService.findAll()
                         .collectList()
                         .flatMap(tracks -> Mono.fromCallable(() -> {
-                            ProducerRecord<String, String> producerRecord = new ProducerRecord<>(BOOK_REQUEST_TOPIC_NAME, "update", objectMapper.writeValueAsString(tracks));
+                            ProducerRecord<String, String> producerRecord = new ProducerRecord<>(KAFKA_REQUEST_TOPIC_VALUE, "update", objectMapper.writeValueAsString(tracks));
                             ConsumerRecord<String, String> record = replyingKafkaTemplate.sendAndReceive(producerRecord).get();
                             List<Track> trackList = objectMapper.readValue(record.value(), typeReference);
                             System.out.println(trackList);
@@ -191,12 +180,11 @@ public class TrackControllerImpl implements TrackController {
     }
 
     private Mono<Track> writeMonoTrackListToJsonAndPutToCacheCreate(Track track, String key, String hKey) {
-        return Mono.fromCallable(() -> objectMapper.writeValueAsString(track))
-                .flatMap(string -> reactiveStringRedisTemplate
-                        .scan(ScanOptions.scanOptions().match("flux/*").build())
-                        .flatMap(reactiveStringRedisTemplate::delete)
-                        .flatMap(map -> opsForHash.put(key, hKey, string))
-                        .collectList()
-                        .thenReturn(track));
+        return reactiveStringRedisTemplate.scan(ScanOptions.scanOptions().match("flux/*").build())
+                .flatMap(reactiveStringRedisTemplate::delete)
+                .collectList()
+                .flatMap(list -> Mono.fromCallable(() -> objectMapper.writeValueAsString(track)))
+                .flatMap(s -> opsForHash.put(key,hKey,s))
+                .thenReturn(track);
     }
 }

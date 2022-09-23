@@ -17,10 +17,8 @@ import java.util.List;
 @NoArgsConstructor
 public class Artist implements Serializable {
 
-    @Min(0)
     private Long id;
 
-    @NotBlank
     private String name;
 
     @JsonIgnore

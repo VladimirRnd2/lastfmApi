@@ -14,16 +14,16 @@ import org.springframework.messaging.handler.annotation.SendTo;
 
 import java.util.List;
 
+import static com.zuzex.lastfm.shared.consts.CommonConstants.*;
+
 @AllArgsConstructor
 public class KafkaConsumerImpl implements KafkaConsumer {
 
     private final ObjectMapper objectMapper;
     private final TrackService trackService;
 
-    private static final TypeReference<List<TrackResponse>> typeReference = new TypeReference<List<TrackResponse>>() {};
-
     @Override
-    @KafkaListener(topics = "bookRq", groupId = "foo", containerFactory = "kafkaListenerContainerFactory")
+    @KafkaListener(topics = KAFKA_REQUEST_TOPIC_VALUE, groupId = KAFKA_GROUP_ID_VALUE, containerFactory = KAFKA_LISTENER_CONTAINER_FACTORY)
     @SendTo
     public String listen(ConsumerRecord<String, String> consumerRecord) throws JsonProcessingException {
         String key = consumerRecord.key();

@@ -19,6 +19,8 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
+import static com.zuzex.music.shared.constants.CommonConstants.*;
+
 @Configuration
 @EnableKafka
 public class KafkaConfig {
@@ -26,10 +28,10 @@ public class KafkaConfig {
     @Bean
     public Map<String, Object> consumerConfigs() {
         Map<String, Object> props = new HashMap<>();
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:29092");
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_BOOTSTRAP_SERVER_VALUE);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, "foo");
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, KAFKA_GROUP_ID_VALUE);
 
         return props;
     }
@@ -37,7 +39,7 @@ public class KafkaConfig {
     @Bean
     public Map<String, Object> producerConfigs() {
         Map<String, Object> props = new HashMap<>();
-        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:29092");
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_BOOTSTRAP_SERVER_VALUE);
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         return props;
@@ -56,13 +58,13 @@ public class KafkaConfig {
 
     @Bean
     public KafkaMessageListenerContainer<String, String> replyListenerContainer() {
-        ContainerProperties containerProperties = new ContainerProperties("bookRs");
+        ContainerProperties containerProperties = new ContainerProperties(KAFKA_RESPONSE_TOPIC_VALUE);
         return new KafkaMessageListenerContainer<>(replyConsumerFactory(), containerProperties);
     }
 
     @Bean
-    public ReplyingKafkaTemplate<String,String,String> replyingKafkaTemplate() {
-        ReplyingKafkaTemplate<String,String,String> replyingKafkaTemplate = new ReplyingKafkaTemplate<>(requestProducerFactory(),replyListenerContainer());
+    public ReplyingKafkaTemplate<String, String, String> replyingKafkaTemplate() {
+        ReplyingKafkaTemplate<String, String, String> replyingKafkaTemplate = new ReplyingKafkaTemplate<>(requestProducerFactory(), replyListenerContainer());
         replyingKafkaTemplate.setDefaultReplyTimeout(Duration.ofSeconds(10));
         return replyingKafkaTemplate;
     }

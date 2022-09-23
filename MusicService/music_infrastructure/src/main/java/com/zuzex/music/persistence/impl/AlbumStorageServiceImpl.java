@@ -2,7 +2,7 @@ package com.zuzex.music.persistence.impl;
 
 import com.zuzex.music.model.Album;
 import com.zuzex.music.persistence.entity.AlbumEntity;
-import com.zuzex.music.persistence.mapper.AlbumRepositoryMapper;
+import com.zuzex.music.persistence.mapper.AlbumMapper;
 import com.zuzex.music.persistence.repository.AlbumReactiveRepository;
 import com.zuzex.music.usecase.album.port.AlbumStorageService;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +13,7 @@ import reactor.core.publisher.Mono;
 public class AlbumStorageServiceImpl implements AlbumStorageService {
 
     private final AlbumReactiveRepository albumReactiveRepository;
-    private final AlbumRepositoryMapper mapper;
+    private final AlbumMapper mapper;
 
     @Override
     public Mono<Album> createAlbum(Album album, Long artistId) {

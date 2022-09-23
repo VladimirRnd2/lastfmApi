@@ -15,10 +15,10 @@ import reactor.core.publisher.Flux;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static com.zuzex.lastfm.usecase.track.consts.MainConsts.API_KEY;
+
 @RequiredArgsConstructor
 public class TrackServiceImpl implements TrackService {
-
-    private final static String API_KEY = "2fdfc34423cf61d7872486aa750a892f";
 
     private final AlbumService albumService;
     private final ArtistService artistService;
@@ -47,7 +47,7 @@ public class TrackServiceImpl implements TrackService {
         return info
                 .getTracks()
                 .stream()
-                .map(track -> createNewTrack(track.getName(),artistName))
+                .map(track -> createNewTrack(track.getName(), artistName))
                 .collect(Collectors.toList());
     }
 
@@ -55,7 +55,15 @@ public class TrackServiceImpl implements TrackService {
     public List<TrackResponse> updateTracks(List<TrackResponse> trackResponseList) {
         return trackResponseList.stream()
                 .map(trackResponse ->
-                        createNewTrack(trackResponse.getName(),trackResponse.getArtist().getName()))
-                .collect(Collectors.toList());
+                        updateTrack(Track.getInfo
+                                        (trackResponse.getArtist().getName(), trackResponse.getName(), API_KEY)
+                                , trackResponse)
+                ).collect(Collectors.toList());
+    }
+
+    private TrackResponse updateTrack(Track trackInfo, TrackResponse trackResponse) {
+        trackResponse.setListeners(trackInfo.getListeners());
+        trackResponse.setPlaycount(trackInfo.getPlaycount());
+        return trackResponse;
     }
 }

@@ -4,10 +4,9 @@ import com.zuzex.music.model.Album;
 import com.zuzex.music.persistence.entity.AlbumEntity;
 import com.zuzex.music.shared.mapper.RepositoryMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
 
-@RequiredArgsConstructor
-public class AlbumRepositoryMapper implements RepositoryMapper<Album, AlbumEntity> {
-
+public class AlbumMapper implements RepositoryMapper<Album, AlbumEntity> {
 
     @Override
     public Album mapToTable(AlbumEntity persistenceObject) {

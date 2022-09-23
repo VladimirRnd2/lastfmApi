@@ -16,24 +16,17 @@ import java.util.List;
 @NoArgsConstructor
 public class Track implements Serializable {
 
-    @Min(0)
     private Long id;
 
-    @NotBlank
     private String name;
 
     @JsonIgnore
     private String mbid;
 
-    @NotNull
-    @Positive
     private Integer listeners;
 
-    @NotNull
-    @Positive
     private Integer playcount;
 
-    @NotEmpty
     private Artist artist;
 
     private Album album;

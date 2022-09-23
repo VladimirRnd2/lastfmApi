@@ -3,8 +3,9 @@ package com.zuzex.music.persistence.mapper;
 import com.zuzex.music.model.Artist;
 import com.zuzex.music.persistence.entity.ArtistEntity;
 import com.zuzex.music.shared.mapper.RepositoryMapper;
+import org.springframework.stereotype.Component;
 
-public class ArtistRepositoryMapper implements RepositoryMapper<Artist, ArtistEntity> {
+public class ArtistMapper implements RepositoryMapper<Artist, ArtistEntity> {
 
     @Override
     public Artist mapToTable(ArtistEntity persistenceObject) {

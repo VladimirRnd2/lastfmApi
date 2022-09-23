@@ -4,10 +4,10 @@ import com.zuzex.music.persistence.impl.AlbumStorageServiceImpl;
 import com.zuzex.music.persistence.impl.ArtistStorageServiceImpl;
 import com.zuzex.music.persistence.impl.GenreStorageServiceImpl;
 import com.zuzex.music.persistence.impl.TrackStorageServiceImpl;
-import com.zuzex.music.persistence.mapper.AlbumRepositoryMapper;
-import com.zuzex.music.persistence.mapper.ArtistRepositoryMapper;
-import com.zuzex.music.persistence.mapper.GenreRepositoryMapper;
-import com.zuzex.music.persistence.mapper.TrackRepositoryMapper;
+import com.zuzex.music.persistence.mapper.AlbumMapper;
+import com.zuzex.music.persistence.mapper.ArtistMapper;
+import com.zuzex.music.persistence.mapper.GenreMapper;
+import com.zuzex.music.persistence.mapper.TrackMapper;
 import com.zuzex.music.persistence.repository.*;
 import com.zuzex.music.usecase.album.AlbumService;
 import com.zuzex.music.usecase.album.AlbumServiceImpl;
@@ -98,23 +98,23 @@ public class MusicServiceConfiguration {
     }
 
     @Bean
-    public TrackRepositoryMapper trackRepositoryMapper() {
-        return new TrackRepositoryMapper();
+    public TrackMapper trackRepositoryMapper() {
+        return new TrackMapper();
     }
 
     @Bean
-    public ArtistRepositoryMapper artistRepositoryMapper() {
-        return new ArtistRepositoryMapper();
+    public ArtistMapper artistRepositoryMapper() {
+        return new ArtistMapper();
     }
 
     @Bean
-    public AlbumRepositoryMapper albumRepositoryMapper() {
-        return new AlbumRepositoryMapper();
+    public AlbumMapper albumRepositoryMapper() {
+        return new AlbumMapper();
     }
 
     @Bean
-    public GenreRepositoryMapper genreRepositoryMapper() {
-        return new GenreRepositoryMapper();
+    public GenreMapper genreRepositoryMapper() {
+        return new GenreMapper();
     }
 
     @Bean

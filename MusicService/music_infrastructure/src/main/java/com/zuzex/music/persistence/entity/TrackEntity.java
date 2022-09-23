@@ -21,12 +21,18 @@ public class TrackEntity implements Serializable {
 
     @Id
     private Long id;
+
     private String name;
+
     private String mbid;
+
     private Integer listeners;
+
     private Integer playcount;
+
     @Column(value = "artist_id")
     private Long artistId;
+
     @Column("album_id")
     private Long albumId;
 }

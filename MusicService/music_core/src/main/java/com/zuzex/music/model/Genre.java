@@ -17,11 +17,9 @@ import java.util.List;
 @NoArgsConstructor
 public class Genre implements Serializable {
 
-    @Min(0)
     @JsonIgnore
     private Long id;
 
-    @NotBlank
     private String name;
 
     @JsonIgnore

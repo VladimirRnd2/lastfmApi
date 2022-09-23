@@ -17,8 +17,10 @@ public class TrackGenreEntity {
 
     @Id
     private Long id;
+
     @Column(value = "track_id")
     private Long trackId;
+
     @Column(value = "genre_id")
     private Long genreId;
 }
